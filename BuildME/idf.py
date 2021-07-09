@@ -425,6 +425,12 @@ def extract_layers(construction):
 
 
 def get_fenestration_objects_from_surface(idf, surface_obj):
+    """
+    Finds all fenestration objects assigned to a given surface
+    :param idf: The .idf file
+    :param surface_obj: Surface object (BuildingSurface:Detailed)
+    :return: list of fenestration objects
+    """
     surface = surface_obj.Name
     fenestration = []
     for item in ['Window', 'Door', 'FenestrationSurface:Detailed']:

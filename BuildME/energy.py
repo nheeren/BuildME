@@ -122,6 +122,15 @@ def run_energyplus_single(tmp_path):
             with open('EPObjects.txt', 'r') as epobjects:
                 merged_idf.write(epobjects.read())
             run_idf = 'merged.idf'
+    elif os.path.exists('GHTIn.idf'):
+        with open("log_Slab.txt", 'w') as log_file:
+            subprocess.call('Slab', shell=True, stdout=log_file, stderr=log_file)
+        with open('merged.idf', 'w') as merged_idf:
+            with open('expanded.idf', 'r') as expanded_idf:
+                merged_idf.write(expanded_idf.read())
+            with open('SLABSurfaceTemps.TXT', 'r') as epobjects:
+                merged_idf.write(epobjects.read())
+        run_idf = 'merged.idf'
     else:
         run_idf = 'expanded.idf'
 

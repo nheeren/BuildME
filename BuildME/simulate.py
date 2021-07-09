@@ -14,7 +14,7 @@ from time import sleep
 import pandas as pd
 from tqdm import tqdm
 
-from BuildME import settings, idf, material, energy, __version__
+from BuildME import settings, idf, material, energy, mmv, __version__
 
 
 def create_combinations(comb=settings.combinations):
@@ -43,20 +43,23 @@ def create_combinations(comb=settings.combinations):
                     for climate_reg in comb[region]['climate_region']:
                         # 6 Climate scenario
                         for climate_scen in comb[region]['climate_scenario']:
-                            fname = '_'.join([region, occ_type, energy_std, res, climate_reg, climate_scen])
-                            fnames[fname] = \
-                                {
-                                'climate_file': os.path.join(settings.climate_files_path, climate_scen,
-                                                             settings.climate_stations[region][climate_reg]),
-                                'archetype_file': os.path.join(settings.archetypes, region, occ_type + '.idf'),
-                                # TODO
-                                'energy_standard': [region, occ_type, energy_std],
-                                'RES': [region, occ_type, res],
-                                'run_folder': os.path.join(settings.tmp_path, fname)
-                                }
-                            # make sure no underscores are used in the pathname, because this could cause issues later
-                            assert list(fnames)[-1].count('_') == 5, \
-                                "Scenario combination names mustn't use underscores: '%s'" % fnames[-1]
+                            for cool in comb[region]['cooling']:
+                                fname = '_'.join([region, occ_type, energy_std, res, climate_reg, climate_scen, cool])
+                                fnames[fname] = \
+                                    {
+                                    'climate_file': os.path.join(settings.climate_files_path, climate_scen,
+                                                                 settings.climate_stations[region][climate_reg]),
+                                    'archetype_file': os.path.join(settings.archetypes, region, occ_type + '.idf'),
+                                    'energy_standard': [region, occ_type, energy_std],
+                                    'RES': [region, occ_type, res],
+                                    'region': region,
+                                    'occupation': occ_type,
+                                    'cooling': cool,
+                                    'run_folder': os.path.join(settings.tmp_path, fname)
+                                    }
+                                # make sure no underscores are used in the pathname, because this could cause issues later
+                                assert list(fnames)[-1].count('_') == 6, \
+                                    "Scenario combination names mustn't use underscores: '%s'" % fnames[-1]
     return fnames
 
 
@@ -134,7 +137,6 @@ def copy_scenario_files(fnames, replace=False):
         print("DELETING %i folders..." % len(fnames))
         nuke_folders(fnames)
     print("Copying files...")
-    en_replace = pd.read_excel('./data/replace.xlsx', index_col=[0, 1, 2], sheet_name='en-standard')
     res_replace = pd.read_excel('./data/replace.xlsx', index_col=[0, 1, 2], sheet_name='RES')
     tq = tqdm(fnames, leave=True)
     for fname in tq:
@@ -146,11 +148,14 @@ def copy_scenario_files(fnames, replace=False):
         shutil.copy(fnames[fname]['climate_file'], os.path.join(fpath, 'in.epw'))
         # copy IDF archetype file
         idf_f = idf.read_idf(fnames[fname]['archetype_file'])
+        if fnames[fname]['cooling'] == 'MMV':
+            print("\nChanging the archetype to one with MMV (cooling through HVAC + window opening)")
+            idf_f = mmv.change_archetype_to_MMV(idf_f, fnames[fname])
+        en_replace = pd.read_excel('./data/replace.xlsx', index_col=[0, 1, 2], sheet_name='en-standard')
         idf_f = apply_obj_name_change(idf_f, fnames[fname]['energy_standard'],
                                        '-en-std-replaceme')
         idf_f = apply_obj_name_change(idf_f, fnames[fname]['RES'],
                                        '-res-replaceme')
-
         idf_f = apply_rule_from_excel(idf_f, fnames[fname]['energy_standard'], en_replace)
         idf_f = apply_rule_from_excel(idf_f, fnames[fname]['RES'], res_replace)
         idf_f.idfobjects['Building'.upper()][0].Name = fname
